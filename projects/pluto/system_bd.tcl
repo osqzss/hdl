@@ -243,16 +243,32 @@ ad_connect  axi_ad9361/l_clk axi_ad9361/clk
 ad_connect axi_ad9361/l_clk cpack/clk
 ad_connect axi_ad9361/rst cpack/reset
 
+# crpa_core: two-element combiner and covariance integrator (pluto-crpa).
+# The ADC outputs feed crpa_core; its capture mux (CTRL.CAP_SEL) drives cpack and
+# its DAC mux (CTRL.DAC_SEL) sits between tx_upack and axi_ad9361. Both select
+# the original path after reset. The DAC mux is combinational; the capture path
+# adds one l_clk register. The cpack enables stay on axi_ad9361.
+
+ad_ip_instance crpa_core crpa_core
+
+ad_connect axi_ad9361/l_clk crpa_core/clk
+ad_connect axi_ad9361/rst crpa_core/rst
+ad_connect axi_ad9361/adc_valid_i0 crpa_core/adc_valid
+ad_connect axi_ad9361/adc_data_i0 crpa_core/adc_data_i0
+ad_connect axi_ad9361/adc_data_q0 crpa_core/adc_data_q0
+ad_connect axi_ad9361/adc_data_i1 crpa_core/adc_data_i1
+ad_connect axi_ad9361/adc_data_q1 crpa_core/adc_data_q1
+
 ad_connect axi_ad9361/adc_enable_i1 cpack/enable_2
-ad_connect axi_ad9361/adc_data_i1 cpack/fifo_wr_data_2
+ad_connect crpa_core/cap_data_2 cpack/fifo_wr_data_2
 ad_connect axi_ad9361/adc_enable_q1 cpack/enable_3
-ad_connect axi_ad9361/adc_data_q1 cpack/fifo_wr_data_3
+ad_connect crpa_core/cap_data_3 cpack/fifo_wr_data_3
 
 ad_connect axi_ad9361/adc_enable_i0 cpack/enable_0
-ad_connect axi_ad9361/adc_data_i0 cpack/fifo_wr_data_0
+ad_connect crpa_core/cap_data_0 cpack/fifo_wr_data_0
 ad_connect axi_ad9361/adc_enable_q0 cpack/enable_1
-ad_connect axi_ad9361/adc_data_q0 cpack/fifo_wr_data_1
-ad_connect axi_ad9361/adc_valid_i0 cpack/fifo_wr_en
+ad_connect crpa_core/cap_data_1 cpack/fifo_wr_data_1
+ad_connect crpa_core/cap_valid cpack/fifo_wr_en
 
 ad_connect axi_ad9361_adc_dma/fifo_wr cpack/packed_fifo_wr
 
@@ -260,15 +276,20 @@ ad_connect  axi_ad9361/l_clk tx_upack/clk
 ad_connect  axi_ad9361/rst tx_upack/reset
 
 ad_connect axi_ad9361/dac_enable_i0 tx_upack/enable_0
-ad_connect axi_ad9361/dac_data_i0 tx_upack/fifo_rd_data_0
+ad_connect tx_upack/fifo_rd_data_0 crpa_core/dma_dac_data_i0
 ad_connect axi_ad9361/dac_enable_q0 tx_upack/enable_1
-ad_connect axi_ad9361/dac_data_q0 tx_upack/fifo_rd_data_1
+ad_connect tx_upack/fifo_rd_data_1 crpa_core/dma_dac_data_q0
 ad_connect axi_ad9361/dac_valid_i0 tx_upack/fifo_rd_en
 
 ad_connect axi_ad9361/dac_enable_i1 tx_upack/enable_2
-ad_connect axi_ad9361/dac_data_i1 tx_upack/fifo_rd_data_2
+ad_connect tx_upack/fifo_rd_data_2 crpa_core/dma_dac_data_i1
 ad_connect axi_ad9361/dac_enable_q1 tx_upack/enable_3
-ad_connect axi_ad9361/dac_data_q1 tx_upack/fifo_rd_data_3
+ad_connect tx_upack/fifo_rd_data_3 crpa_core/dma_dac_data_q1
+
+ad_connect crpa_core/dac_data_i0 axi_ad9361/dac_data_i0
+ad_connect crpa_core/dac_data_q0 axi_ad9361/dac_data_q0
+ad_connect crpa_core/dac_data_i1 axi_ad9361/dac_data_i1
+ad_connect crpa_core/dac_data_q1 axi_ad9361/dac_data_q1
 
 ad_connect tx_upack/s_axis  axi_ad9361_dac_dma/m_axis
 
@@ -315,6 +336,7 @@ ad_cpu_interconnect 0x7C400000 axi_ad9361_adc_dma
 ad_cpu_interconnect 0x7C420000 axi_ad9361_dac_dma
 ad_cpu_interconnect 0x7C430000 axi_spi
 ad_cpu_interconnect 0x7C440000 axi_tdd_0
+ad_cpu_interconnect 0x7C450000 crpa_core
 
 ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP1 {1}
 ad_connect sys_cpu_clk sys_ps7/S_AXI_HP1_ACLK
@@ -344,3 +366,4 @@ ad_connect sys_cpu_resetn axi_ad9361_dac_dma/m_src_axi_aresetn
 ad_cpu_interrupt ps-13 mb-13 axi_ad9361_adc_dma/irq
 ad_cpu_interrupt ps-12 mb-12 axi_ad9361_dac_dma/irq
 ad_cpu_interrupt ps-11 mb-11 axi_spi/ip2intc_irpt
+ad_cpu_interrupt ps-10 mb-10 crpa_core/irq
